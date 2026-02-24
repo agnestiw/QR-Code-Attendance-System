@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Generate QR Absensi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <!-- QR Library -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+    }
+
+    h2 {
+      color: #333;
+      font-size: 28px;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .subtitle {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    button {
+      background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+      color: white;
+      border: none;
+      padding: 14px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 180, 216, 0.4);
+      margin-bottom: 30px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 180, 216, 0.6);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    #qrcode {
+      margin: 0 auto 30px;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 15px;
+      min-height: 240px;
+      align-items: center;
+    }
+
+    .info-box {
+      background: #e0f7ff;
+      border-left: 4px solid #00b4d8;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: left;
+    }
+
+    #info {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 15px;
+      line-height: 1.8;
+    }
+
+    #info b {
+      color: #0077b6;
+      font-weight: 600;
+    }
+
+    #timer {
+      font-size: 18px;
+      font-weight: bold;
+      color: #0077b6;
+      text-align: center;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      margin-top: 15px;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 30px 20px;
+      }
+
+      h2 {
+        font-size: 24px;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>QR Absensi</h2>
+    <p class="subtitle">Generate QR Code untuk sistem absensi</p>
+
+    <button onclick="generateQR()">📱 Generate QR Code</button>
+
+    <div id="qrcode"></div>
+
+    <div class="info-box">
+      <div id="info"></div>
+      <div id="timer"></div>
+    </div>
+  </div>
+
+<script>
+const BASE_API = "https://script.google.com/macros/s/AKfycbwtaOPeaNCevIXk1SaP2KlhFrsUFAc0fyn_vPwiqUVEiJSzF_9nn56zH_hKEYjzaweG/exec";
+
+let countdownInterval = null;
+
+function generateQR() {
+  document.getElementById("qrcode").innerHTML = "";
+  document.getElementById("info").innerHTML = "Generating QR...";
+  document.getElementById("timer").innerHTML = "";
+
+  // stop timer lama kalau ada
+  if (countdownInterval) clearInterval(countdownInterval);
+
+  fetch(`${BASE_API}?action=generate`)
+    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) {
+        alert("Gagal generate QR");
+        return;
+      }
+
+      const { checkin_url, expires_at, qr_token } = res.data;
+
+      // Generate QR
+      new QRCode(document.getElementById("qrcode"), {
+        text: checkin_url,
+        width: 220,
+        height: 220
+      });
+
+      document.getElementById("info").innerHTML = `
+        <b>Token:</b> ${qr_token}<br>
+        <b>Berlaku sampai:</b> ${new Date(expires_at).toLocaleTimeString()}
+      `;
+
+      startCountdown(expires_at);
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Error koneksi ke server");
+    });
+}
+
+function startCountdown(expiresAt) {
+  const endTime = new Date(expiresAt).getTime();
+
+  countdownInterval = setInterval(() => {
+    const now = Date.now();
+    const diff = endTime - now;
+
+    if (diff <= 0) {
+      clearInterval(countdownInterval);
+      document.getElementById("timer").innerHTML = "⛔ QR EXPIRED";
+      document.getElementById("qrcode").innerHTML = "";
+      return;
+    }
+
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+
+    document.getElementById("timer").innerHTML =
+      `⏳ Sisa waktu: ${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+  }, 1000);
+}
+</script>
+
+</body>
+</html>
